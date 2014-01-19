@@ -1,0 +1,228 @@
+<html>
+<head>
+    <style type="text/css">
+        h1,h2 {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1 style="margin: 0; padding: 0">A "Game of life" game</h1>
+<canvas id="canvas" style="float: left; border: 1px solid black;" width="1px" height="1px">
+    This needs a canvas able browser
+</canvas>
+<div style="float:left; margin-left: 20px" id="where-the-world-is-made-up-and-the-points-do-matter">
+    <h2>Get to the top!</h2>
+    <p>You're goal is to climb up in the game of life <!-- So deep, right? --></p>
+    <h2>Controls</h2>
+    <p>Use your cursor keys to move around and space to jump.</p>
+    <p>To make the world evolve faster press "s".</p>
+    <h2>Points</h2>
+    <p>Max height reached: <span id="maxHeight">0</span></p>
+    <p>Movements made: <span id="movementsMade">0</span></p>
+</div>
+
+<script type="text/javascript">
+var cellSize = 10,
+    gridWidth = 50,
+    gridHeight = 50,
+    drawWidth = gridWidth * cellSize,
+    drawHeight = gridHeight * cellSize,
+    initialIteration = 5,
+    iteration = 0,
+    maxHeightReached = 0,
+    canvas = document.getElementById('canvas'),
+    context = canvas.getContext('2d'),
+    baseGravity = 300,
+    gravity = 300,
+    lock = 0,
+    color = "",
+    field = createField(gridWidth, gridHeight, function() {
+        return Math.random() < 0.25
+    });
+
+canvas.width = drawWidth;
+canvas.height = drawHeight;
+
+for(;--initialIteration;) {
+    turn(field);
+}
+
+player = {
+    x : parseInt(gridWidth / 2),
+    y : gridHeight - 1,
+    movementsMade : 0,
+    items : {
+
+    },
+    left : function() {
+        player.erasePlayer();
+        player.x -= 1;
+        player.drawPlayer();
+        player.recordMovement();
+    },
+    right : function() {
+        player.erasePlayer();
+        player.x += 1;
+        player.drawPlayer();
+        player.recordMovement();
+    },
+    up : function() {
+        player.erasePlayer();
+        player.y -= 1;
+        player.drawPlayer();
+        player.recordMovement();
+    },
+    down : function() {
+        player.erasePlayer();
+        player.y += 1;
+        player.drawPlayer();
+        player.recordMovement();
+    },
+    erasePlayer : function() {
+        if (field[player.x][player.y]) {
+            color = '#00F';
+        } else {
+            color = '#FFF';
+        }
+        drawCell(color, player.x, player.y);
+    },
+    drawPlayer : function() {
+        drawCell('#0F0', player.x, player.y);
+    },
+    recordMovement : function () {
+        player.movementsMade++;
+        document.getElementById('movementsMade').innerHTML = "" + player.movementsMade;
+    }
+};
+
+document.onkeyup = function() {
+    lock = 0;
+};
+
+document.onkeydown = function(e) {
+    if (lock > 2) {
+        return;
+    }
+    lock++;
+    if (e.keyCode == 37 && player.x != 0) {
+        player.left();
+    } else if (e.keyCode == 39 && player.x != gridWidth -1) {
+        player.right();
+    } else if((e.keyCode == 32 || e.keyCode == 38) && player.y != 0
+        && (isSomethingBelowPlayer() || isSomethingBehindPlayer())
+    ) {
+        player.up();
+        updateScores();
+    } else if (e.keyCode == 83) {
+        step();
+    }
+};
+
+setTimeout(applyGravity, gravity);
+setInterval(step, 2000);
+
+function isSomethingBelowPlayer() {
+    return player.y == gridHeight - 1 || field[player.x][player.y + 1];
+}
+
+function isSomethingBehindPlayer() {
+    return player.y == gridHeight - 1 || field[player.x][player.y];
+}
+
+
+function applyGravity() {
+    if (player.y < gridHeight -1 && isSomethingBelowPlayer() == false) {
+        player.down();
+        gravity /= 2;
+        setTimeout(applyGravity, Math.max(gravity, 75));
+        return;
+    }
+    gravity = baseGravity;
+    setTimeout(applyGravity, gravity);
+}
+
+function updateScores() {
+    var heightReached = gridHeight - player.y - 1;
+    if (heightReached > maxHeightReached) {
+        maxHeightReached = heightReached;
+        document.getElementById('maxHeight').innerHTML = "" + maxHeightReached;
+    }
+}
+
+function step() {
+    turn(field);
+    drawField(field);
+    player.drawPlayer();
+}
+
+function turn(field) {
+    var statusMap = createField(gridWidth, gridHeight, function() { return new Array(2); }),
+            neighbours,
+            alive;
+    field.forEach(function(row, x) {
+        row.forEach(function(value, y) {
+            statusMap[x][y][0] =
+                isAlive(x - 1, y - 1, field) +
+                    isAlive(x - 1, y, field) +
+                    isAlive(x - 1, y + 1, field) +
+                    isAlive(x, y - 1, field) +
+                    isAlive(x, y + 1, field) +
+                    isAlive(x + 1, y - 1, field) +
+                    isAlive(x + 1, y, field) +
+                    isAlive(x + 1, y + 1, field);
+            statusMap[x][y][1] = value;
+        })
+    });
+    statusMap.forEach(function(row, x) {
+        row.forEach(function(cell, y) {
+            neighbours = cell[0];
+            alive = cell[1];
+            if (alive) {
+                if (neighbours != 2 && neighbours != 3) {
+                    field[x][y] = 0;
+                }
+            } else if (neighbours == 3) {
+                field[x][y] = 1;
+            }
+        })
+    });
+}
+
+function isAlive(x, y, field) {
+    if (x < 0 || y < 0 || x == gridWidth || y == gridHeight) {
+        return false;
+    }
+    return field[x][y] == 1;
+}
+
+function createField(x, y, valueGenerator) {
+    return Array.apply(null, new Array(x)).map(function() {
+        return Array.apply(null, new Array(y)).map(valueGenerator)
+    });
+}
+
+function drawCell(color, x, y) {
+    context.fillStyle = color;
+    context.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+}
+
+function drawField(field) {
+    var color;
+    field.forEach(function(row, x) {
+        row.forEach(function(value, y) {
+            if (value) {
+                color = '#00F';
+            } else {
+                color = '#FFF';
+            }
+            drawCell(color, x, y);
+        });
+    });
+}
+
+</script>
+</body>
+</html>
